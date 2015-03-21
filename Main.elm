@@ -29,23 +29,25 @@ type alias Simulation = { models : List Model.String1D,
 
 defaultSim = {models = [defaultStr], state = Paused}
 
+curModel sim = List.head sim.models
+
 -- Step
 
 stepSim : Event -> Simulation -> Simulation
 stepSim ev sim =
-    let cur_model = List.head sim.models
-        dt = 1/100
+    let dt = 1/100
         safe_tail lst = if List.length lst > 1 then List.tail lst else lst
+        add_model model = model :: sim.models
     in case ev of
       Tick t -> case sim.state of
-                  Playing -> { sim | models <- Model.step cur_model dt :: sim.models}
+                  Playing -> { sim | models <- add_model <| Model.step (curModel sim) dt}
                   Paused -> sim
       Button Pause -> { sim | state <- Paused }
       Button Play -> { sim | state <- Playing }
       Button Back -> { sim | state <- Paused
                      , models <- safe_tail sim.models}
       Button Forward -> { sim | state <- Paused
-                        , models <-  Model.step cur_model dt :: sim.models}
+                        , models <- add_model <| Model.step (curModel sim) dt}
       Button Default -> defaultSim
 
 -- Events
@@ -73,6 +75,8 @@ type2label bt =
       Forward -> "Forward"
       Default -> "Default"
 
+roundi : Float -> Float -> Float
+roundi i a = (toFloat (round (10^i*a)))/10^i
 
 -- Render UI
 
@@ -89,8 +93,9 @@ playPauseButton sim =
 buttons sim = flow right [ makeButton Back
                          , playPauseButton sim
                          , makeButton Forward
-                         , makeButton Default]
+                         , makeButton Default
+                         , asText <| roundi 2 ((curModel sim).t)]
 
-renderSim sim = flow down [ Renderer.render (List.head sim.models)
+renderSim sim = flow down [ Renderer.render (curModel sim)
                           , buttons sim]
 main = renderSim <~ Signal.foldp stepSim defaultSim events
