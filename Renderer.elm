@@ -1,11 +1,14 @@
 module Renderer where
 
 import Array
-import Color (lightBlue, lightGreen)
-import Graphics.Collage (collage, path, traced, solid, Path)
+import Color (lightBlue, lightGreen, gray)
+import Graphics.Collage (collage, path, traced, solid, dashed, Path)
+import List
 
 import Model
 
+collageOffsetX = 0
+collageOffsetY = 0
 collageWidth  = 400
 collageHeight = 400
 
@@ -27,6 +30,24 @@ drawString1DQ str =
     let pathify i x = (x*400-200, (Model.getQ str i)*30)
     in path <| Array.toList <| Array.indexedMap pathify str.x
 
-render str = collage collageWidth collageHeight
-             [ traced (solid lightBlue) (drawString1D str)
-             , traced (solid lightGreen) (drawString1DQ str)]
+
+drawBorder : Float -> Path
+drawBorder x = path [(x*400-200, -200), (x*400-200, collageHeight)]
+
+
+drawBorders : Model.String1D -> List Path
+drawBorders str = List.map drawBorder str.borders
+
+render str =
+    let borderlines = List.map (traced (dashed gray)) <| drawBorders str
+    in collage collageWidth collageHeight <| List.append borderlines [ traced (solid lightBlue) (drawString1D str)
+                                                                     , traced (solid lightGreen) (drawString1DQ str)]
+
+inCollage : (Int, Int) -> Bool
+inCollage (x, y) = (collageWidth + collageOffsetX >= x) && (collageHeight + collageOffsetY >= y)
+
+layerRelativeY : (Int, Int) -> Float
+layerRelativeY (x, y) = (200 - (toFloat y))/30
+
+asX : (Int, Int) -> Float
+asX (x, y) = 1/400 * (toFloat x)

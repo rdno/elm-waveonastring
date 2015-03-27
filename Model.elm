@@ -10,6 +10,8 @@ import Utils
 type Boundary = Fixed | Loose | None
 
 type alias String1D = { x : Array.Array Float
+                      , borders: List Float
+                      , layers: List Float
                       , q : Array.Array Float
                       , u : Array.Array Float
                       , u_old: Array.Array Float
@@ -75,12 +77,14 @@ postBoundary : String1D -> String1D
 postBoundary str = str
 
 string1d : (Float, Float) -> Float -> List Float -> List Float -> (Float -> Float -> Float) -> String1D
-string1d (sx, ex) nx boundaries qs source =
+string1d (sx, ex) nx borders layers source =
     let x = Array.fromList <| Utils.linspace sx ex nx
         t = 0
         u = Array.map (source t) x
-        q = Array.map (calcQ boundaries qs) x
+        q = Array.map (calcQ borders layers) x
     in { x = x
+       , borders = borders
+       , layers = layers
        , q = q
        , u = u
        , u_old = u
@@ -90,9 +94,39 @@ string1d (sx, ex) nx boundaries qs source =
        , right = None}
 
 calcQ : List Float -> List Float -> Float -> Float
-calcQ boundaries qs x =
-    let b_len = List.length boundaries
-        lessers = List.filter (\a -> x < a) boundaries
+calcQ borders layers x =
+    let b_len = List.length borders
+        lessers = List.filter (\a -> x < a) borders
         l_len = List.length lessers
-        qa = Array.fromList qs
+        qa = Array.fromList layers
     in getOrZero (b_len-l_len) qa
+
+
+whichLayer : String1D -> Float -> Int
+whichLayer str px = List.length <| List.filter (\x -> x <= px) str.borders
+
+
+addBorderAt : String1D -> Float -> String1D
+addBorderAt str x =
+    let layerID = whichLayer str x
+        newLayer = getOrZero layerID <| Array.fromList str.layers
+        (front, back) = Utils.splitList str.layers layerID
+        newBorders = List.sort <| x :: str.borders
+        newLayers = List.append front <| newLayer :: back
+    in { str | borders <- newBorders
+             , layers <- newLayers
+             , q <- Array.map (calcQ newBorders newLayers) str.x}
+
+removeBorderAt : String1D -> Int -> String1D
+removeBorderAt str layerID =
+    let newBorders = Utils.spliceList str.borders layerID 1
+        newLayers = Utils.spliceList str.layers (layerID+1) 1
+    in { str | borders <- newBorders
+             , layers <- newLayers
+             , q <- Array.map (calcQ newBorders newLayers) str.x}
+
+updateLayerAt : String1D -> Int -> Float -> String1D
+updateLayerAt str layerID newValue =
+    let newLayers = Array.toList <| Array.set layerID newValue <| Array.fromList str.layers
+    in { str | layers <- newLayers
+             , q <- Array.map (calcQ str.borders newLayers) str.x}
