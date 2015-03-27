@@ -2,7 +2,12 @@
 
 Work in progress...
 
+[Live Demo][demo]
+
 Rıdvan Örsvuran 2015
 
 
-[elm-lang]: elm-lang.org "Elm - functional web programming"
+[elm-lang]: http://elm-lang.org "Elm - functional web programming"
+
+[demo]: http://rdno.github.io/elm-waveonastring/
+
