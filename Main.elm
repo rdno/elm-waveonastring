@@ -1,10 +1,11 @@
-import Graphics.Element (Element, flow, down, right)
+import Graphics.Element (Element, flow, down, right, spacer)
 import Graphics.Input as Input
 import List
 import Mouse
 import Signal ((<~))
 import Signal
 import Text (asText)
+import Text
 import Time (fps)
 import Time
 
@@ -44,18 +45,19 @@ stepSim ev sim =
     let dt = 1/100
         safe_tail lst = if List.length lst > 1 then List.tail lst else lst
         add_model model = model :: sim.models
-        whichLayer pos = Model.whichLayer (curModel sim) <| Renderer.asX pos
-        updateLayer pos = Model.updateLayerAt (curModel sim) (whichLayer pos) (Renderer.layerRelativeY pos)
+        cur_model = curModel sim
+        whichLayer pos = Model.whichLayer cur_model <| Renderer.asX pos
+        updateLayer pos = Model.updateLayerAt cur_model (whichLayer pos) (Renderer.layerRelativeY pos)
     in case ev of
       Tick t -> case sim.state of
-                  Playing -> { sim | models <- add_model <| Model.step (curModel sim) dt}
+                  Playing -> { sim | models <- add_model <| Model.step cur_model dt}
                   Paused -> sim
       Button Pause -> { sim | state <- Paused }
       Button Play -> { sim | state <- Playing }
       Button Back -> { sim | state <- Paused
                      , models <- safe_tail sim.models}
       Button Forward -> { sim | state <- Paused
-                        , models <- add_model <| Model.step (curModel sim) dt}
+                        , models <- add_model <| Model.step cur_model dt}
       Button Default -> defaultSim
       MouseMove pos ->  if Renderer.inCollage pos then
                             case sim.editMode of
@@ -68,7 +70,7 @@ stepSim ev sim =
                            NoEdit -> { sim | models <- add_model <|  updateLayer sim.lastMousePos
                                              , editMode <- MoveQ}
                            AddBorder -> let newBorder = Renderer.asX sim.lastMousePos
-                                        in {sim | models <- add_model <|  Model.addBorderAt (curModel sim) newBorder
+                                        in {sim | models <- add_model <|  Model.addBorderAt cur_model newBorder
                                            , editMode <- NoEdit}
                            RemoveBorder -> let px = Renderer.asX sim.lastMousePos
                                                m = curModel sim
@@ -80,6 +82,8 @@ stepSim ev sim =
                      else { sim | editMode <- NoEdit}
       Button AddBorderBtn -> { sim | editMode <- AddBorder }
       Button RemoveBorderBtn -> { sim | editMode <- RemoveBorder }
+      BoundaryChanged (Just (b, Left)) -> { sim | models <- add_model <| {cur_model | left <- b}}
+      BoundaryChanged (Just (b, Right)) -> { sim | models <- add_model <| {cur_model | right <- b}}
 
 
 -- Events
@@ -91,13 +95,19 @@ type ButtonType = None | Play | Pause | Back | Forward
 buttontype : Signal.Channel ButtonType
 buttontype = Signal.channel None
 
+type Place = Left | Right
+
+boundary : Signal.Channel (Maybe (Model.Boundary, Place))
+boundary = Signal.channel Nothing
+
 ticks = fps 100
 type Event = Tick Time.Time | Button ButtonType
-           | MouseMove (Int, Int) | MouseDown Bool
+           | MouseMove (Int, Int) | MouseDown Bool | BoundaryChanged (Maybe (Model.Boundary, Place))
 events = Signal.mergeMany [ Signal.map Tick ticks
                           , Signal.map Button (Signal.subscribe buttontype)
                           , Signal.map MouseMove Mouse.position
-                          , Signal.map MouseDown Mouse.isDown]
+                          , Signal.map MouseDown Mouse.isDown
+                          , Signal.map BoundaryChanged (Signal.subscribe boundary)]
 
 
 -- Utils
@@ -136,5 +146,25 @@ buttons sim = flow right [ makeButton Back
 
 borderButtons = flow right [makeButton AddBorderBtn, makeButton RemoveBorderBtn]
 
-renderSim sim = flow down [(flow down [Renderer.render (curModel sim), buttons sim]), borderButtons]
+makeDropdown place = Input.dropDown (Signal.send boundary) [
+                      ("Fixed", Just (Model.Fixed, place))
+                     ,("Loose",  Just (Model.Loose, place))]
+
+label value = Text.leftAligned <| Text.fromString value
+
+boundaryDropdowns = flow right [ label "Left: "
+                               , spacer 10 10
+                               , makeDropdown Left
+                               , spacer 10 10
+                               , label "Right: "
+                               , spacer 10 10
+                               , makeDropdown Right]
+
+
+renderSim sim = flow down [(flow down [Renderer.render (curModel sim), buttons sim])
+                          , spacer 10 10
+                          , borderButtons
+                          , spacer 10 10
+                          , boundaryDropdowns]
+
 main = renderSim <~ Signal.foldp stepSim defaultSim events

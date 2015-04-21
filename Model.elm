@@ -62,13 +62,28 @@ step str dt =
     let dx = getDx str
         last = (Array.length str.x) - 1
         nt = str.t + dt
+        u0 nstr =
+            case nstr.left of
+              Fixed -> 0
+              Loose -> getU nstr 1
+              None -> getUold nstr 1
+        uL nstr =
+            case nstr.right of
+              Fixed -> 0
+              Loose -> getU nstr (last-1)
+              None -> getUold nstr (last-2)
         stepNode i _ =
-            if | i == 0    ->  getU str i
-               | i == last ->  getU str i
+            if | i == 0    ->  u0 str
+               | i == last ->  uL str
                | otherwise ->  finiteDifference str i dt
-    in { str | t <- nt
-       , u <- Array.indexedMap (\i x -> stepNode i x) str.x
-       , u_old <- str.u}
+        -- Apply Boundary conditions
+        bc nstr =
+            let set_u0 = Array.set 0 (u0 nstr)
+                set_uL = Array.set last (uL nstr)
+            in { nstr | u <- set_uL <| set_u0 nstr.u}
+    in bc <| { str | t <- nt
+             , u <- Array.indexedMap (\i x -> stepNode i x) str.x
+             , u_old <- str.u}
 
 preBoundary : String1D -> String1D
 preBoundary str = str
@@ -90,8 +105,8 @@ string1d (sx, ex) nx borders layers source =
        , u_old = u
        , t = t
        , source = source
-       , left = None
-       , right = None}
+       , left = Fixed
+       , right = Fixed}
 
 calcQ : List Float -> List Float -> Float -> Float
 calcQ borders layers x =
