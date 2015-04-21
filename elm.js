@@ -1905,6 +1905,7 @@ Elm.Main.make = function (_elm) {
    $Graphics$Element = Elm.Graphics.Element.make(_elm),
    $Graphics$Input = Elm.Graphics.Input.make(_elm),
    $List = Elm.List.make(_elm),
+   $Maybe = Elm.Maybe.make(_elm),
    $Model = Elm.Model.make(_elm),
    $Mouse = Elm.Mouse.make(_elm),
    $Renderer = Elm.Renderer.make(_elm),
@@ -1912,6 +1913,9 @@ Elm.Main.make = function (_elm) {
    $Text = Elm.Text.make(_elm),
    $Time = Elm.Time.make(_elm),
    $Utils = Elm.Utils.make(_elm);
+   var label = function (value) {
+      return $Text.leftAligned($Text.fromString(value));
+   };
    var roundi = F2(function (i,a) {
       return $Basics.toFloat($Basics.round(Math.pow(10,
       i) * a)) / Math.pow(10,i);
@@ -1931,8 +1935,12 @@ Elm.Main.make = function (_elm) {
             case "RemoveBorderBtn":
             return "Remove Border";}
          _U.badCase($moduleName,
-         "between lines 107 and 114");
+         "between lines 117 and 124");
       }();
+   };
+   var BoundaryChanged = function (a) {
+      return {ctor: "BoundaryChanged"
+             ,_0: a};
    };
    var MouseDown = function (a) {
       return {ctor: "MouseDown"
@@ -1950,6 +1958,38 @@ Elm.Main.make = function (_elm) {
       return {ctor: "Tick",_0: a};
    };
    var ticks = $Time.fps(100);
+   var boundary = $Signal.channel($Maybe.Nothing);
+   var makeDropdown = function (place) {
+      return A2($Graphics$Input.dropDown,
+      $Signal.send(boundary),
+      _L.fromArray([{ctor: "_Tuple2"
+                    ,_0: "Fixed"
+                    ,_1: $Maybe.Just({ctor: "_Tuple2"
+                                     ,_0: $Model.Fixed
+                                     ,_1: place})}
+                   ,{ctor: "_Tuple2"
+                    ,_0: "Loose"
+                    ,_1: $Maybe.Just({ctor: "_Tuple2"
+                                     ,_0: $Model.Loose
+                                     ,_1: place})}]));
+   };
+   var Right = {ctor: "Right"};
+   var Left = {ctor: "Left"};
+   var boundaryDropdowns = A2($Graphics$Element.flow,
+   $Graphics$Element.right,
+   _L.fromArray([label("Left: ")
+                ,A2($Graphics$Element.spacer,
+                10,
+                10)
+                ,makeDropdown(Left)
+                ,A2($Graphics$Element.spacer,
+                10,
+                10)
+                ,label("Right: ")
+                ,A2($Graphics$Element.spacer,
+                10,
+                10)
+                ,makeDropdown(Right)]));
    var Default = {ctor: "Default"};
    var RemoveBorderBtn = {ctor: "RemoveBorderBtn"};
    var AddBorderBtn = {ctor: "AddBorderBtn"};
@@ -1970,7 +2010,10 @@ Elm.Main.make = function (_elm) {
                                                $Mouse.position)
                                                ,A2($Signal.map,
                                                MouseDown,
-                                               $Mouse.isDown)]));
+                                               $Mouse.isDown)
+                                               ,A2($Signal.map,
+                                               BoundaryChanged,
+                                               $Signal.subscribe(boundary))]));
    var makeButton = function (bt) {
       return A2($Graphics$Input.button,
       A2($Signal.send,buttontype,bt),
@@ -1985,7 +2028,7 @@ Elm.Main.make = function (_elm) {
             case "Playing":
             return makeButton(Pause);}
          _U.badCase($moduleName,
-         "between lines 126 and 128");
+         "between lines 136 and 138");
       }();
    };
    var borderButtons = A2($Graphics$Element.flow,
@@ -2013,7 +2056,14 @@ Elm.Main.make = function (_elm) {
                    $Graphics$Element.down,
                    _L.fromArray([$Renderer.render(curModel(sim))
                                 ,buttons(sim)]))
-                   ,borderButtons]));
+                   ,A2($Graphics$Element.spacer,
+                   10,
+                   10)
+                   ,borderButtons
+                   ,A2($Graphics$Element.spacer,
+                   10,
+                   10)
+                   ,boundaryDropdowns]));
    };
    var Simulation = F4(function (a,
    b,
@@ -2055,12 +2105,13 @@ Elm.Main.make = function (_elm) {
    var stepSim = F2(function (ev,
    sim) {
       return function () {
+         var cur_model = curModel(sim);
          var whichLayer = function (pos) {
-            return $Model.whichLayer(curModel(sim))($Renderer.asX(pos));
+            return $Model.whichLayer(cur_model)($Renderer.asX(pos));
          };
          var updateLayer = function (pos) {
             return A3($Model.updateLayerAt,
-            curModel(sim),
+            cur_model,
             whichLayer(pos),
             $Renderer.layerRelativeY(pos));
          };
@@ -2076,7 +2127,28 @@ Elm.Main.make = function (_elm) {
          var dt = 1 / 100;
          return function () {
             switch (ev.ctor)
-            {case "Button":
+            {case "BoundaryChanged":
+               switch (ev._0.ctor)
+                 {case "Just":
+                    switch (ev._0._0.ctor)
+                      {case "_Tuple2":
+                         switch (ev._0._0._1.ctor)
+                           {case "Left":
+                              return _U.replace([["models"
+                                                 ,add_model(_U.replace([["left"
+                                                                        ,ev._0._0._0]],
+                                                 cur_model))]],
+                                sim);
+                              case "Right":
+                              return _U.replace([["models"
+                                                 ,add_model(_U.replace([["right"
+                                                                        ,ev._0._0._0]],
+                                                 cur_model))]],
+                                sim);}
+                           break;}
+                      break;}
+                 break;
+               case "Button":
                switch (ev._0.ctor)
                  {case "AddBorderBtn":
                     return _U.replace([["editMode"
@@ -2095,7 +2167,7 @@ Elm.Main.make = function (_elm) {
                                        ,Paused]
                                       ,["models"
                                        ,add_model(A2($Model.step,
-                                       curModel(sim),
+                                       cur_model,
                                        dt))]],
                       sim);
                     case "Pause":
@@ -2113,14 +2185,14 @@ Elm.Main.make = function (_elm) {
                  break;
                case "MouseDown":
                return ev._0 && $Renderer.inCollage(sim.lastMousePos) ? function () {
-                    var _v7 = sim.editMode;
-                    switch (_v7.ctor)
+                    var _v11 = sim.editMode;
+                    switch (_v11.ctor)
                     {case "AddBorder":
                        return function () {
                             var newBorder = $Renderer.asX(sim.lastMousePos);
                             return _U.replace([["models"
                                                ,add_model(A2($Model.addBorderAt,
-                                               curModel(sim),
+                                               cur_model,
                                                newBorder))]
                                               ,["editMode",NoEdit]],
                             sim);
@@ -2134,12 +2206,13 @@ Elm.Main.make = function (_elm) {
                        return function () {
                             var m = curModel(sim);
                             var px = $Renderer.asX(sim.lastMousePos);
-                            var n = $List.filter(function (_v8) {
+                            var n = $List.filter(function (_v12) {
                                return function () {
-                                  switch (_v8.ctor)
-                                  {case "_Tuple2": return _v8._1;}
+                                  switch (_v12.ctor)
+                                  {case "_Tuple2":
+                                     return _v12._1;}
                                   _U.badCase($moduleName,
-                                  "on line 75, column 76 to 77");
+                                  "on line 77, column 76 to 77");
                                }();
                             })(A2($List.indexedMap,
                             F2(function (i,x) {
@@ -2165,8 +2238,8 @@ Elm.Main.make = function (_elm) {
                  sim);
                case "MouseMove":
                return $Renderer.inCollage(ev._0) ? function () {
-                    var _v12 = sim.editMode;
-                    switch (_v12.ctor)
+                    var _v16 = sim.editMode;
+                    switch (_v16.ctor)
                     {case "MoveQ":
                        return _U.replace([["models"
                                           ,add_model(updateLayer(ev._0))]
@@ -2180,20 +2253,20 @@ Elm.Main.make = function (_elm) {
                  sim);
                case "Tick":
                return function () {
-                    var _v13 = sim.state;
-                    switch (_v13.ctor)
+                    var _v17 = sim.state;
+                    switch (_v17.ctor)
                     {case "Paused": return sim;
                        case "Playing":
                        return _U.replace([["models"
                                           ,add_model(A2($Model.step,
-                                          curModel(sim),
+                                          cur_model,
                                           dt))]],
                          sim);}
                     _U.badCase($moduleName,
-                    "between lines 50 and 53");
+                    "between lines 52 and 55");
                  }();}
             _U.badCase($moduleName,
-            "between lines 49 and 82");
+            "between lines 51 and 86");
          }();
       }();
    });
@@ -2227,11 +2300,15 @@ Elm.Main.make = function (_elm) {
                       ,RemoveBorderBtn: RemoveBorderBtn
                       ,Default: Default
                       ,buttontype: buttontype
+                      ,Left: Left
+                      ,Right: Right
+                      ,boundary: boundary
                       ,ticks: ticks
                       ,Tick: Tick
                       ,Button: Button
                       ,MouseMove: MouseMove
                       ,MouseDown: MouseDown
+                      ,BoundaryChanged: BoundaryChanged
                       ,events: events
                       ,type2label: type2label
                       ,roundi: roundi
@@ -2239,6 +2316,9 @@ Elm.Main.make = function (_elm) {
                       ,playPauseButton: playPauseButton
                       ,buttons: buttons
                       ,borderButtons: borderButtons
+                      ,makeDropdown: makeDropdown
+                      ,label: label
+                      ,boundaryDropdowns: boundaryDropdowns
                       ,renderSim: renderSim
                       ,main: main};
    return _elm.Main.values;
@@ -2411,31 +2491,72 @@ Elm.Model.make = function (_elm) {
    var step = F2(function (str,
    dt) {
       return function () {
+         var u0 = function (nstr) {
+            return function () {
+               var _v0 = nstr.left;
+               switch (_v0.ctor)
+               {case "Fixed": return 0;
+                  case "Loose": return A2(getU,
+                    nstr,
+                    1);
+                  case "None": return A2(getUold,
+                    nstr,
+                    1);}
+               _U.badCase($moduleName,
+               "between lines 66 and 70");
+            }();
+         };
          var nt = str.t + dt;
          var last = $Array.length(str.x) - 1;
-         var stepNode = F2(function (i,
-         _v0) {
+         var uL = function (nstr) {
             return function () {
-               return _U.eq(i,0) ? A2(getU,
-               str,
-               i) : _U.eq(i,last) ? A2(getU,
-               str,
-               i) : A3(finiteDifference,
+               var _v1 = nstr.right;
+               switch (_v1.ctor)
+               {case "Fixed": return 0;
+                  case "Loose": return A2(getU,
+                    nstr,
+                    last - 1);
+                  case "None": return A2(getUold,
+                    nstr,
+                    last - 2);}
+               _U.badCase($moduleName,
+               "between lines 71 and 75");
+            }();
+         };
+         var stepNode = F2(function (i,
+         _v2) {
+            return function () {
+               return _U.eq(i,
+               0) ? u0(str) : _U.eq(i,
+               last) ? uL(str) : A3(finiteDifference,
                str,
                i,
                dt);
             }();
          });
+         var bc = function (nstr) {
+            return function () {
+               var set_uL = A2($Array.set,
+               last,
+               uL(nstr));
+               var set_u0 = A2($Array.set,
+               0,
+               u0(nstr));
+               return _U.replace([["u"
+                                  ,set_uL(set_u0(nstr.u))]],
+               nstr);
+            }();
+         };
          var dx = getDx(str);
-         return _U.replace([["t",nt]
-                           ,["u"
-                            ,A2($Array.indexedMap,
-                            F2(function (i,x) {
-                               return A2(stepNode,i,x);
-                            }),
-                            str.x)]
-                           ,["u_old",str.u]],
-         str);
+         return bc(_U.replace([["t",nt]
+                              ,["u"
+                               ,A2($Array.indexedMap,
+                               F2(function (i,x) {
+                                  return A2(stepNode,i,x);
+                               }),
+                               str.x)]
+                              ,["u_old",str.u]],
+         str));
       }();
    });
    var calcQ = F3(function (borders,
@@ -2552,19 +2673,21 @@ Elm.Model.make = function (_elm) {
       };
    };
    var None = {ctor: "None"};
-   var string1d = F5(function (_v2,
+   var Loose = {ctor: "Loose"};
+   var Fixed = {ctor: "Fixed"};
+   var string1d = F5(function (_v4,
    nx,
    borders,
    layers,
    source) {
       return function () {
-         switch (_v2.ctor)
+         switch (_v4.ctor)
          {case "_Tuple2":
             return function () {
                  var t = 0;
                  var x = $Array.fromList(A3($Utils.linspace,
-                 _v2._0,
-                 _v2._1,
+                 _v4._0,
+                 _v4._1,
                  nx));
                  var u = A2($Array.map,
                  source(t),
@@ -2575,9 +2698,9 @@ Elm.Model.make = function (_elm) {
                  return {_: {}
                         ,borders: borders
                         ,layers: layers
-                        ,left: None
+                        ,left: Fixed
                         ,q: q
-                        ,right: None
+                        ,right: Fixed
                         ,source: source
                         ,t: t
                         ,u: u
@@ -2585,11 +2708,9 @@ Elm.Model.make = function (_elm) {
                         ,x: x};
               }();}
          _U.badCase($moduleName,
-         "between lines 81 and 94");
+         "between lines 96 and 109");
       }();
    });
-   var Loose = {ctor: "Loose"};
-   var Fixed = {ctor: "Fixed"};
    _elm.Model.values = {_op: _op
                        ,Fixed: Fixed
                        ,Loose: Loose
