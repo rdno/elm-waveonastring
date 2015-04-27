@@ -44,12 +44,12 @@ stepSim : Event -> Simulation -> Simulation
 stepSim ev sim =
     let dt = 1/500
         safe_tail lst = if List.length lst > 1 then List.tail lst else lst
-        -- TODO: do not store environment changes instead modify the last one
         modelSizeLimit = floor (1/dt*10)  -- store 10 sn of data
         add_model model =
             if List.length sim.models < modelSizeLimit
             then model :: sim.models
             else model :: (List.take (modelSizeLimit - 1) sim.models)
+        modifyLast model = model :: (safe_tail sim.models)
         cur_model = curModel sim
         whichLayer coord = Model.whichLayer cur_model <| Renderer.getX coord
         vToQ v = v^2
@@ -69,27 +69,27 @@ stepSim ev sim =
                         in case Renderer.canvasMousePosition pos of
                              Just coord ->
                               case sim.editMode of
-                                MoveQ ->  { updatedSim | models <- add_model <| updateLayer coord }
+                                MoveQ ->  { updatedSim | models <- modifyLast <| updateLayer coord }
                                 otherwise -> updatedSim
                              Nothing -> updatedSim
       MouseDown False -> { sim | editMode <- NoEdit}
       MouseDown True -> case Renderer.canvasMousePosition sim.lastMousePos of
                           Just coord ->
                               case sim.editMode of
-                                NoEdit -> { sim | models  <- add_model <| updateLayer coord
+                                NoEdit -> { sim | models  <- modifyLast <| updateLayer coord
                                           ,       editMode <- MoveQ}
-                                AddBorder -> { sim | models <- add_model <| Model.addBorderAt cur_model <| Renderer.getX coord
+                                AddBorder -> { sim | models <- modifyLast <| Model.addBorderAt cur_model <| Renderer.getX coord
                                              ,       editMode <- NoEdit}
                                 RemoveBorder -> let px = Renderer.getX coord
                                                     n = List.filter (\(i, x) -> x) <| List.indexedMap (\i x -> (i, Utils.near x px 0.01)) cur_model.borders
                                                     layerID = if List.isEmpty n then List.length cur_model.layers else fst <| List.head n
-                                                in { sim | models <- add_model <| Model.removeBorderAt cur_model layerID
+                                                in { sim | models <- modifyLast <| Model.removeBorderAt cur_model layerID
                                                    ,       editMode <- NoEdit}
                           Nothing -> { sim | editMode <- NoEdit }
       Button AddBorderBtn -> { sim | editMode <- AddBorder }
       Button RemoveBorderBtn -> { sim | editMode <- RemoveBorder }
-      BoundaryChanged (Just (b, Left)) -> { sim | models <- add_model <| {cur_model | left <- b}}
-      BoundaryChanged (Just (b, Right)) -> { sim | models <- add_model <| {cur_model | right <- b}}
+      BoundaryChanged (Just (b, Left)) -> { sim | models <- modifyLast <| {cur_model | left <- b}}
+      BoundaryChanged (Just (b, Right)) -> { sim | models <- modifyLast <| {cur_model | right <- b}}
 
 
 -- Events
