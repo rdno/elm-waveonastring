@@ -26,15 +26,18 @@ defaultStr = Model.string1d (0, 1) 500 boundaries qs f
 -- Initiate Simulation
 
 type State = Playing | Paused
-type EditMode = AddBorder | RemoveBorder | MoveQ | NoEdit
+type EditMode = AddBorder | RemoveBorder | MoveV | MoveReceiver | NoEdit
 
 type alias Simulation = { models : List Model.String1D
                         , state : State
                         , editMode : EditMode
-                        , lastMousePos : (Int, Int)}
+                        , lastMousePos : (Int, Int)
+                        , dt : Float
+                        , receiver: Int}
 
 defaultSim = { models = [defaultStr], state = Paused
-             , editMode = NoEdit, lastMousePos = (0, 0)}
+             , editMode = NoEdit, lastMousePos = (0, 0)
+             , dt = 1/500, receiver = 300}
 
 curModel sim = List.head sim.models
 
@@ -42,7 +45,7 @@ curModel sim = List.head sim.models
 
 stepSim : Event -> Simulation -> Simulation
 stepSim ev sim =
-    let dt = 1/500
+    let dt = sim.dt
         safe_tail lst = if List.length lst > 1 then List.tail lst else lst
         modelSizeLimit = floor (1/dt*10)  -- store 10 sn of data
         add_model model =
@@ -69,15 +72,22 @@ stepSim ev sim =
                         in case Renderer.canvasMousePosition pos of
                              Just coord ->
                               case sim.editMode of
-                                MoveQ ->  { updatedSim | models <- modifyLast <| updateLayer coord }
+                                MoveV ->  { updatedSim | models <- modifyLast <| updateLayer coord }
+                                MoveReceiver -> { updatedSim | receiver <- Model.getXID cur_model <| Renderer.getX coord}
                                 otherwise -> updatedSim
                              Nothing -> updatedSim
       MouseDown False -> { sim | editMode <- NoEdit}
       MouseDown True -> case Renderer.canvasMousePosition sim.lastMousePos of
                           Just coord ->
                               case sim.editMode of
-                                NoEdit -> { sim | models  <- modifyLast <| updateLayer coord
-                                          ,       editMode <- MoveQ}
+                                NoEdit ->
+                                    if | Renderer.canvasMouseOnV sim.lastMousePos ->
+                                           { sim | models  <- modifyLast <| updateLayer coord
+                                           ,       editMode <- MoveV}
+                                       | Renderer.canvasMouseOnU sim.lastMousePos ->
+                                           { sim | receiver <- Model.getXID cur_model <| Renderer.getX coord
+                                           ,       editMode <- MoveReceiver}
+                                       | otherwise ->  sim
                                 AddBorder -> { sim | models <- modifyLast <| Model.addBorderAt cur_model <| Renderer.getX coord
                                              ,       editMode <- NoEdit}
                                 RemoveBorder -> let px = Renderer.getX coord
@@ -167,7 +177,7 @@ boundaryDropdowns = flow right [ label "Left: "
                                , makeDropdown Right]
 
 
-renderSim sim = flow down [(flow down [Renderer.render (curModel sim), buttons sim])
+renderSim sim = flow down [(flow down [Renderer.render sim, buttons sim])
                           , spacer 10 10
                           , borderButtons
                           , spacer 10 10

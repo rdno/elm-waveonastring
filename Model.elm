@@ -32,6 +32,9 @@ getX str i = getOrZero i str.x
 getDx : String1D -> Float
 getDx str = (getX str 1) - (getX str 0)
 
+getXID : String1D -> Float -> Int
+getXID str x = floor (x / (getDx str))
+
 getU : String1D -> Int -> Float
 getU str i = getOrZero i str.u
 

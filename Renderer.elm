@@ -1,7 +1,7 @@
 module Renderer where
 
 import Array
-import Color (lightBlue, lightGreen, gray)
+import Color (lightBlue, lightGreen, gray, lightRed, lightOrange)
 import Graphics.Collage (collage, path, traced, solid, dashed, Path)
 import List
 import Maybe
@@ -12,6 +12,12 @@ type alias Rectangle = { x0: Float
                        , y0: Float
                        , w: Float
                        , h: Float}
+
+inRectangle : (Float, Float) -> Rectangle -> Bool
+inRectangle (x, y) rec =
+    let inX = (x <= (rec.x0 + rec.w)) && (x >= rec.x0)
+        inY = (y <= (rec.y0 + rec.h)) && (y >= rec.y0)
+    in inX && inY
 
 -- interval (min_value, max_value)
 type alias Interval = (Float, Float)
@@ -69,6 +75,16 @@ converterV = { x   = (0, 1)
              , y   = (0, 1)
              , rec = rectV}
 
+-- receiver
+rectR = { x0 = -200
+        , y0 = -150
+        , w  = 400
+        , h  = 100}
+
+converterR = { x = (0, 10)
+             , y = (-1, 1)
+             , rec = rectR}
+
 -- returns the V value for position within limits
 getV : (Float, Float) -> Float
 getV (x, y) =
@@ -100,10 +116,27 @@ drawBorder x = path [(spaceX converterU x, -1*collageRec.h/2), (spaceX converter
 drawBorders : Model.String1D -> List Path
 drawBorders str = List.map drawBorder str.borders
 
-render str =
-    let borderlines = List.map (traced (dashed gray)) <| drawBorders str
+drawReceiver sim =
+    let str = List.head sim.models
+        x = Model.getX str sim.receiver
+    in path [(spaceX converterU x, spaceY converterU 1), (spaceX converterU x, spaceY converterU -1)]
+
+drawLog sim =
+    let str = List.head sim.models
+        x = Model.getX str sim.receiver
+        getAmp str = Model.getU str sim.receiver
+        values = List.reverse <| List.map getAmp sim.models
+        n = List.length values
+        ts = List.map (\x -> (toFloat x)*sim.dt) [0..n]
+    in plot converterR ts values
+
+render sim =
+    let str = List.head sim.models
+        borderlines = List.map (traced (dashed gray)) <| drawBorders str
     in collage (floor collageRec.w) (floor collageRec.h) <| List.append borderlines [ traced (solid lightBlue) (drawString1D str)
-                                                                                    , traced (solid lightGreen) (drawString1DV str)]
+                                                                                    , traced (solid lightGreen) (drawString1DV str)
+                                                                                    , traced (solid lightRed) (drawReceiver sim)
+                                                                                    , traced (solid lightOrange) (drawLog sim)]
 
 -- Mouse
 canvasMousePosition : (Int, Int) -> Maybe (Float, Float)
@@ -118,3 +151,15 @@ canvasMousePosition (x, y) =
         yInCanvas = abs(canvasY) <= halfH
     in if xInCanvas && yInCanvas then Just (canvasX, canvasY)
        else Nothing
+
+canvasMouseOnV : (Int, Int) -> Bool
+canvasMouseOnV pos =
+    case canvasMousePosition pos of
+      Just coord -> inRectangle coord rectV
+      Nothing    -> False
+
+canvasMouseOnU : (Int, Int) -> Bool
+canvasMouseOnU pos =
+    case canvasMousePosition pos of
+      Just coord -> inRectangle coord rectU
+      Nothing    -> False
