@@ -1935,7 +1935,7 @@ Elm.Main.make = function (_elm) {
             case "RemoveBorderBtn":
             return "Remove Border";}
          _U.badCase($moduleName,
-         "between lines 117 and 124");
+         "between lines 133 and 140");
       }();
    };
    var BoundaryChanged = function (a) {
@@ -2028,7 +2028,7 @@ Elm.Main.make = function (_elm) {
             case "Playing":
             return makeButton(Pause);}
          _U.badCase($moduleName,
-         "between lines 136 and 138");
+         "between lines 152 and 154");
       }();
    };
    var borderButtons = A2($Graphics$Element.flow,
@@ -2054,7 +2054,7 @@ Elm.Main.make = function (_elm) {
       $Graphics$Element.down,
       _L.fromArray([A2($Graphics$Element.flow,
                    $Graphics$Element.down,
-                   _L.fromArray([$Renderer.render(curModel(sim))
+                   _L.fromArray([$Renderer.render(sim)
                                 ,buttons(sim)]))
                    ,A2($Graphics$Element.spacer,
                    10,
@@ -2065,23 +2065,30 @@ Elm.Main.make = function (_elm) {
                    10)
                    ,boundaryDropdowns]));
    };
-   var Simulation = F4(function (a,
+   var Simulation = F6(function (a,
    b,
    c,
-   d) {
+   d,
+   e,
+   f) {
       return {_: {}
+             ,dt: e
              ,editMode: c
              ,lastMousePos: d
              ,models: a
+             ,receiver: f
              ,state: b};
    });
    var NoEdit = {ctor: "NoEdit"};
-   var MoveQ = {ctor: "MoveQ"};
+   var MoveReceiver = {ctor: "MoveReceiver"};
+   var MoveV = {ctor: "MoveV"};
    var RemoveBorder = {ctor: "RemoveBorder"};
    var AddBorder = {ctor: "AddBorder"};
    var Paused = {ctor: "Paused"};
    var Playing = {ctor: "Playing"};
-   var qs = _L.fromArray([1,5,3]);
+   var qs = _L.fromArray([0.5
+                         ,0.25
+                         ,0.15]);
    var boundaries = _L.fromArray([0.3
                                  ,0.7]);
    var f = F2(function (t,x) {
@@ -2091,40 +2098,56 @@ Elm.Main.make = function (_elm) {
    });
    var defaultStr = A5($Model.string1d,
    {ctor: "_Tuple2",_0: 0,_1: 1},
-   300,
+   500,
    boundaries,
    qs,
    f);
    var defaultSim = {_: {}
+                    ,dt: 1 / 500
                     ,editMode: NoEdit
                     ,lastMousePos: {ctor: "_Tuple2"
                                    ,_0: 0
                                    ,_1: 0}
                     ,models: _L.fromArray([defaultStr])
+                    ,receiver: 300
                     ,state: Paused};
    var stepSim = F2(function (ev,
    sim) {
       return function () {
-         var cur_model = curModel(sim);
-         var whichLayer = function (pos) {
-            return $Model.whichLayer(cur_model)($Renderer.asX(pos));
+         var vToQ = function (v) {
+            return Math.pow(v,2);
          };
-         var updateLayer = function (pos) {
+         var cur_model = curModel(sim);
+         var whichLayer = function (coord) {
+            return $Model.whichLayer(cur_model)($Renderer.getX(coord));
+         };
+         var updateLayer = function (coord) {
             return A3($Model.updateLayerAt,
             cur_model,
-            whichLayer(pos),
-            $Renderer.layerRelativeY(pos));
-         };
-         var add_model = function (model) {
-            return A2($List._op["::"],
-            model,
-            sim.models);
+            whichLayer(coord),
+            vToQ($Renderer.getV(coord)));
          };
          var safe_tail = function (lst) {
             return _U.cmp($List.length(lst),
             1) > 0 ? $List.tail(lst) : lst;
          };
-         var dt = 1 / 100;
+         var modifyLast = function (model) {
+            return A2($List._op["::"],
+            model,
+            safe_tail(sim.models));
+         };
+         var dt = sim.dt;
+         var modelSizeLimit = $Basics.floor(1 / dt * 10);
+         var add_model = function (model) {
+            return _U.cmp($List.length(sim.models),
+            modelSizeLimit) < 0 ? A2($List._op["::"],
+            model,
+            sim.models) : A2($List._op["::"],
+            model,
+            A2($List.take,
+            modelSizeLimit - 1,
+            sim.models));
+         };
          return function () {
             switch (ev.ctor)
             {case "BoundaryChanged":
@@ -2135,14 +2158,14 @@ Elm.Main.make = function (_elm) {
                          switch (ev._0._0._1.ctor)
                            {case "Left":
                               return _U.replace([["models"
-                                                 ,add_model(_U.replace([["left"
-                                                                        ,ev._0._0._0]],
+                                                 ,modifyLast(_U.replace([["left"
+                                                                         ,ev._0._0._0]],
                                                  cur_model))]],
                                 sim);
                               case "Right":
                               return _U.replace([["models"
-                                                 ,add_model(_U.replace([["right"
-                                                                        ,ev._0._0._0]],
+                                                 ,modifyLast(_U.replace([["right"
+                                                                         ,ev._0._0._0]],
                                                  cur_model))]],
                                 sim);}
                            break;}
@@ -2183,78 +2206,106 @@ Elm.Main.make = function (_elm) {
                                        ,RemoveBorder]],
                       sim);}
                  break;
-               case "MouseDown":
-               return ev._0 && $Renderer.inCollage(sim.lastMousePos) ? function () {
-                    var _v11 = sim.editMode;
-                    switch (_v11.ctor)
-                    {case "AddBorder":
-                       return function () {
-                            var newBorder = $Renderer.asX(sim.lastMousePos);
-                            return _U.replace([["models"
-                                               ,add_model(A2($Model.addBorderAt,
-                                               cur_model,
-                                               newBorder))]
-                                              ,["editMode",NoEdit]],
-                            sim);
-                         }();
-                       case "NoEdit":
-                       return _U.replace([["models"
-                                          ,add_model(updateLayer(sim.lastMousePos))]
-                                         ,["editMode",MoveQ]],
-                         sim);
-                       case "RemoveBorder":
-                       return function () {
-                            var m = curModel(sim);
-                            var px = $Renderer.asX(sim.lastMousePos);
-                            var n = $List.filter(function (_v12) {
-                               return function () {
-                                  switch (_v12.ctor)
-                                  {case "_Tuple2":
-                                     return _v12._1;}
-                                  _U.badCase($moduleName,
-                                  "on line 77, column 76 to 77");
-                               }();
-                            })(A2($List.indexedMap,
-                            F2(function (i,x) {
-                               return {ctor: "_Tuple2"
-                                      ,_0: i
-                                      ,_1: A3($Utils.near,
-                                      x,
-                                      px,
-                                      1.0e-2)};
-                            }),
-                            m.borders));
-                            var layerID = $List.isEmpty(n) ? $List.length(m.layers) : $Basics.fst($List.head(n));
-                            return _U.replace([["models"
-                                               ,add_model(A2($Model.removeBorderAt,
-                                               m,
-                                               layerID))]
-                                              ,["editMode",NoEdit]],
-                            sim);
-                         }();}
-                    return sim;
-                 }() : _U.replace([["editMode"
-                                   ,NoEdit]],
-                 sim);
+               case "MouseDown": switch (ev._0)
+                 {case false:
+                    return _U.replace([["editMode"
+                                       ,NoEdit]],
+                      sim);
+                    case true: return function () {
+                         var _v11 = $Renderer.canvasMousePosition(sim.lastMousePos);
+                         switch (_v11.ctor)
+                         {case "Just":
+                            return function () {
+                                 var _v13 = sim.editMode;
+                                 switch (_v13.ctor)
+                                 {case "AddBorder":
+                                    return _U.replace([["models"
+                                                       ,modifyLast($Model.addBorderAt(cur_model)($Renderer.getX(_v11._0)))]
+                                                      ,["editMode",NoEdit]],
+                                      sim);
+                                    case "NoEdit":
+                                    return $Renderer.canvasMouseOnV(sim.lastMousePos) ? _U.replace([["models"
+                                                                                                    ,modifyLast(updateLayer(_v11._0))]
+                                                                                                   ,["editMode"
+                                                                                                    ,MoveV]],
+                                      sim) : $Renderer.canvasMouseOnU(sim.lastMousePos) ? _U.replace([["receiver"
+                                                                                                      ,$Model.getXID(cur_model)($Renderer.getX(_v11._0))]
+                                                                                                     ,["editMode"
+                                                                                                      ,MoveReceiver]],
+                                      sim) : sim;
+                                    case "RemoveBorder":
+                                    return function () {
+                                         var px = $Renderer.getX(_v11._0);
+                                         var n = $List.filter(function (_v14) {
+                                            return function () {
+                                               switch (_v14.ctor)
+                                               {case "_Tuple2":
+                                                  return _v14._1;}
+                                               _U.badCase($moduleName,
+                                               "on line 94, column 81 to 82");
+                                            }();
+                                         })(A2($List.indexedMap,
+                                         F2(function (i,x) {
+                                            return {ctor: "_Tuple2"
+                                                   ,_0: i
+                                                   ,_1: A3($Utils.near,
+                                                   x,
+                                                   px,
+                                                   1.0e-2)};
+                                         }),
+                                         cur_model.borders));
+                                         var layerID = $List.isEmpty(n) ? $List.length(cur_model.layers) : $Basics.fst($List.head(n));
+                                         return _U.replace([["models"
+                                                            ,modifyLast(A2($Model.removeBorderAt,
+                                                            cur_model,
+                                                            layerID))]
+                                                           ,["editMode"
+                                                            ,NoEdit]],
+                                         sim);
+                                      }();}
+                                 _U.badCase($moduleName,
+                                 "between lines 82 and 98");
+                              }();
+                            case "Nothing":
+                            return _U.replace([["editMode"
+                                               ,NoEdit]],
+                              sim);}
+                         _U.badCase($moduleName,
+                         "between lines 80 and 99");
+                      }();}
+                 break;
                case "MouseMove":
-               return $Renderer.inCollage(ev._0) ? function () {
-                    var _v16 = sim.editMode;
-                    switch (_v16.ctor)
-                    {case "MoveQ":
-                       return _U.replace([["models"
-                                          ,add_model(updateLayer(ev._0))]
-                                         ,["lastMousePos",ev._0]],
-                         sim);}
-                    return _U.replace([["lastMousePos"
-                                       ,ev._0]],
+               return function () {
+                    var updatedSim = _U.replace([["lastMousePos"
+                                                 ,ev._0]],
                     sim);
-                 }() : _U.replace([["lastMousePos"
-                                   ,ev._0]],
-                 sim);
+                    return function () {
+                       var _v18 = $Renderer.canvasMousePosition(ev._0);
+                       switch (_v18.ctor)
+                       {case "Just":
+                          return function () {
+                               var _v20 = sim.editMode;
+                               switch (_v20.ctor)
+                               {case "MoveReceiver":
+                                  return _U.replace([["receiver"
+                                                     ,$Model.getXID(cur_model)($Renderer.getX(_v18._0))]],
+                                    updatedSim);
+                                  case "MoveV":
+                                  return _U.replace([["models"
+                                                     ,modifyLast(updateLayer(_v18._0))]],
+                                    updatedSim);}
+                               return updatedSim;
+                            }();
+                          case "Nothing":
+                          return updatedSim;}
+                       _U.badCase($moduleName,
+                       "between lines 72 and 79");
+                    }();
+                 }();
                case "Tick":
                return function () {
-                    var _v17 = sim.state;
-                    switch (_v17.ctor)
+                    var _v21 = sim.state;
+                    switch (_v21.ctor)
                     {case "Paused": return sim;
                        case "Playing":
                        return _U.replace([["models"
@@ -2263,10 +2314,10 @@ Elm.Main.make = function (_elm) {
                                           dt))]],
                          sim);}
                     _U.badCase($moduleName,
-                    "between lines 52 and 55");
+                    "between lines 61 and 64");
                  }();}
             _U.badCase($moduleName,
-            "between lines 51 and 86");
+            "between lines 60 and 102");
          }();
       }();
    });
@@ -2285,7 +2336,8 @@ Elm.Main.make = function (_elm) {
                       ,Paused: Paused
                       ,AddBorder: AddBorder
                       ,RemoveBorder: RemoveBorder
-                      ,MoveQ: MoveQ
+                      ,MoveV: MoveV
+                      ,MoveReceiver: MoveReceiver
                       ,NoEdit: NoEdit
                       ,Simulation: Simulation
                       ,defaultSim: defaultSim
@@ -2442,6 +2494,10 @@ Elm.Model.make = function (_elm) {
       str,
       1) - A2(getX,str,0);
    };
+   var getXID = F2(function (str,
+   x) {
+      return $Basics.floor(x / getDx(str));
+   });
    var getU = F2(function (str,i) {
       return A2(getOrZero,i,str.u);
    });
@@ -2503,7 +2559,7 @@ Elm.Model.make = function (_elm) {
                     nstr,
                     1);}
                _U.badCase($moduleName,
-               "between lines 66 and 70");
+               "between lines 69 and 73");
             }();
          };
          var nt = str.t + dt;
@@ -2520,7 +2576,7 @@ Elm.Model.make = function (_elm) {
                     nstr,
                     last - 2);}
                _U.badCase($moduleName,
-               "between lines 71 and 75");
+               "between lines 74 and 78");
             }();
          };
          var stepNode = F2(function (i,
@@ -2708,7 +2764,7 @@ Elm.Model.make = function (_elm) {
                         ,x: x};
               }();}
          _U.badCase($moduleName,
-         "between lines 96 and 109");
+         "between lines 99 and 112");
       }();
    });
    _elm.Model.values = {_op: _op
@@ -2719,6 +2775,7 @@ Elm.Model.make = function (_elm) {
                        ,getOrZero: getOrZero
                        ,getX: getX
                        ,getDx: getDx
+                       ,getXID: getXID
                        ,getU: getU
                        ,getUold: getUold
                        ,getQ: getQ
@@ -7061,127 +7118,336 @@ Elm.Renderer.make = function (_elm) {
    $Color = Elm.Color.make(_elm),
    $Graphics$Collage = Elm.Graphics.Collage.make(_elm),
    $List = Elm.List.make(_elm),
+   $Maybe = Elm.Maybe.make(_elm),
    $Model = Elm.Model.make(_elm);
-   var asX = function (_v0) {
+   var rectR = {_: {}
+               ,h: 100
+               ,w: 400
+               ,x0: -200
+               ,y0: -150};
+   var converterR = {_: {}
+                    ,rec: rectR
+                    ,x: {ctor: "_Tuple2"
+                        ,_0: 0
+                        ,_1: 10}
+                    ,y: {ctor: "_Tuple2"
+                        ,_0: -1
+                        ,_1: 1}};
+   var rectV = {_: {}
+               ,h: 100
+               ,w: 400
+               ,x0: -200
+               ,y0: 100};
+   var converterV = {_: {}
+                    ,rec: rectV
+                    ,x: {ctor: "_Tuple2"
+                        ,_0: 0
+                        ,_1: 1}
+                    ,y: {ctor: "_Tuple2"
+                        ,_0: 0
+                        ,_1: 1}};
+   var rectU = {_: {}
+               ,h: 200
+               ,w: 400
+               ,x0: -200
+               ,y0: 0};
+   var converterU = {_: {}
+                    ,rec: rectU
+                    ,x: {ctor: "_Tuple2"
+                        ,_0: 0
+                        ,_1: 1}
+                    ,y: {ctor: "_Tuple2"
+                        ,_0: -2
+                        ,_1: 2}};
+   var Converter = F3(function (a,
+   b,
+   c) {
+      return {_: {}
+             ,rec: c
+             ,x: a
+             ,y: b};
+   });
+   var collageRec = {_: {}
+                    ,h: 400
+                    ,w: 400
+                    ,x0: 0
+                    ,y0: 0};
+   var canvasMousePosition = function (_v0) {
       return function () {
          switch (_v0.ctor)
          {case "_Tuple2":
-            return 1 / 400 * $Basics.toFloat(_v0._0);}
+            return function () {
+                 var halfH = collageRec.h / 2;
+                 var centerY = collageRec.y0 + halfH;
+                 var canvasY = centerY - $Basics.toFloat(_v0._1);
+                 var yInCanvas = _U.cmp($Basics.abs(canvasY),
+                 halfH) < 1;
+                 var halfW = collageRec.w / 2;
+                 var centerX = collageRec.x0 + halfW;
+                 var canvasX = $Basics.toFloat(_v0._0) - centerX;
+                 var xInCanvas = _U.cmp($Basics.abs(canvasX),
+                 halfW) < 1;
+                 return xInCanvas && yInCanvas ? $Maybe.Just({ctor: "_Tuple2"
+                                                             ,_0: canvasX
+                                                             ,_1: canvasY}) : $Maybe.Nothing;
+              }();}
          _U.badCase($moduleName,
-         "on line 53, column 14 to 32");
+         "between lines 144 and 153");
       }();
    };
-   var layerRelativeY = function (_v4) {
+   var intervalLen = function (_v4) {
       return function () {
          switch (_v4.ctor)
          {case "_Tuple2":
-            return (200 - $Basics.toFloat(_v4._1)) / 30;}
+            return _v4._1 - _v4._0;}
          _U.badCase($moduleName,
-         "on line 50, column 26 to 47");
+         "on line 27, column 26 to 33");
       }();
    };
-   var drawString1DQ = function (str) {
-      return function () {
-         var pathify = F2(function (i,
-         x) {
-            return {ctor: "_Tuple2"
-                   ,_0: x * 400 - 200
-                   ,_1: A2($Model.getQ,
-                   str,
-                   i) * 30};
-         });
-         return $Graphics$Collage.path($Array.toList(A2($Array.indexedMap,
-         pathify,
-         str.x)));
-      }();
-   };
-   var toCoordinate = function (_v8) {
-      return function () {
-         switch (_v8.ctor)
-         {case "_Tuple2":
-            return function () {
-                 var startY = 0;
-                 var startX = -200;
-                 var magY = 100;
-                 var magX = 400;
-                 return {ctor: "_Tuple2"
-                        ,_0: startX + _v8._0 * magX
-                        ,_1: startY + _v8._1 * magY};
-              }();}
-         _U.badCase($moduleName,
-         "between lines 17 and 21");
-      }();
-   };
-   var drawString1D = function (str) {
-      return function () {
-         var pathify = F2(function (i,
-         x) {
-            return toCoordinate({ctor: "_Tuple2"
-                                ,_0: x
-                                ,_1: A2($Model.getU,str,i)});
-         });
-         return $Graphics$Collage.path($Array.toList(A2($Array.indexedMap,
-         pathify,
-         str.x)));
-      }();
-   };
-   var collageHeight = 400;
+   var spaceX = F2(function (c,x) {
+      return c.rec.x0 + x * (c.rec.w / intervalLen(c.x));
+   });
    var drawBorder = function (x) {
       return $Graphics$Collage.path(_L.fromArray([{ctor: "_Tuple2"
-                                                  ,_0: x * 400 - 200
-                                                  ,_1: -200}
+                                                  ,_0: A2(spaceX,converterU,x)
+                                                  ,_1: -1 * collageRec.h / 2}
                                                  ,{ctor: "_Tuple2"
-                                                  ,_0: x * 400 - 200
-                                                  ,_1: collageHeight}]));
+                                                  ,_0: A2(spaceX,converterU,x)
+                                                  ,_1: collageRec.h / 2}]));
    };
    var drawBorders = function (str) {
       return A2($List.map,
       drawBorder,
       str.borders);
    };
-   var collageWidth = 400;
-   var render = function (str) {
+   var spaceY = F2(function (c,y) {
+      return c.rec.y0 + y * (c.rec.h / intervalLen(c.y));
+   });
+   var plot = F3(function (conv,
+   xs,
+   ys) {
       return function () {
+         var pathify = F2(function (x,
+         y) {
+            return {ctor: "_Tuple2"
+                   ,_0: A2(spaceX,conv,x)
+                   ,_1: A2(spaceY,conv,y)};
+         });
+         return $Graphics$Collage.path(A3($List.map2,
+         pathify,
+         xs,
+         ys));
+      }();
+   });
+   var drawString1D = function (str) {
+      return function () {
+         var ys = $Array.toList(str.u);
+         var xs = $Array.toList(str.x);
+         return A3(plot,
+         converterU,
+         xs,
+         ys);
+      }();
+   };
+   var drawString1DV = function (str) {
+      return function () {
+         var ys = $List.map($Basics.sqrt)($Array.toList(str.q));
+         var xs = $Array.toList(str.x);
+         return A3(plot,
+         converterV,
+         xs,
+         ys);
+      }();
+   };
+   var drawLog = function (sim) {
+      return function () {
+         var getAmp = function (str) {
+            return A2($Model.getU,
+            str,
+            sim.receiver);
+         };
+         var values = $List.reverse(A2($List.map,
+         getAmp,
+         sim.models));
+         var n = $List.length(values);
+         var ts = A2($List.map,
+         function (x) {
+            return $Basics.toFloat(x) * sim.dt;
+         },
+         _L.range(0,n));
+         var str = $List.head(sim.models);
+         var x = A2($Model.getX,
+         str,
+         sim.receiver);
+         return A3(plot,
+         converterR,
+         ts,
+         values);
+      }();
+   };
+   var drawReceiver = function (sim) {
+      return function () {
+         var str = $List.head(sim.models);
+         var x = A2($Model.getX,
+         str,
+         sim.receiver);
+         return $Graphics$Collage.path(_L.fromArray([{ctor: "_Tuple2"
+                                                     ,_0: A2(spaceX,
+                                                     converterU,
+                                                     x)
+                                                     ,_1: A2(spaceY,
+                                                     converterU,
+                                                     1)}
+                                                    ,{ctor: "_Tuple2"
+                                                     ,_0: A2(spaceX,
+                                                     converterU,
+                                                     x)
+                                                     ,_1: A2(spaceY,
+                                                     converterU,
+                                                     -1)}]));
+      }();
+   };
+   var render = function (sim) {
+      return function () {
+         var str = $List.head(sim.models);
          var borderlines = $List.map($Graphics$Collage.traced($Graphics$Collage.dashed($Color.gray)))(drawBorders(str));
          return A2($Graphics$Collage.collage,
-         collageWidth,
-         collageHeight)(A2($List.append,
+         $Basics.floor(collageRec.w),
+         $Basics.floor(collageRec.h))(A2($List.append,
          borderlines,
          _L.fromArray([A2($Graphics$Collage.traced,
                       $Graphics$Collage.solid($Color.lightBlue),
                       drawString1D(str))
                       ,A2($Graphics$Collage.traced,
                       $Graphics$Collage.solid($Color.lightGreen),
-                      drawString1DQ(str))])));
+                      drawString1DV(str))
+                      ,A2($Graphics$Collage.traced,
+                      $Graphics$Collage.solid($Color.lightRed),
+                      drawReceiver(sim))
+                      ,A2($Graphics$Collage.traced,
+                      $Graphics$Collage.solid($Color.lightOrange),
+                      drawLog(sim))])));
       }();
    };
-   var collageOffsetY = 0;
-   var collageOffsetX = 0;
-   var inCollage = function (_v12) {
+   var dataX = F2(function (c,x) {
+      return (x - c.rec.x0) / (c.rec.w / intervalLen(c.x));
+   });
+   var getX = function (_v8) {
+      return function () {
+         switch (_v8.ctor)
+         {case "_Tuple2":
+            return A2(dataX,
+              converterU,
+              _v8._0);}
+         _U.badCase($moduleName,
+         "on line 67, column 15 to 33");
+      }();
+   };
+   var dataY = F2(function (c,y) {
+      return (y - c.rec.y0) / (c.rec.h / intervalLen(c.y));
+   });
+   var getV = function (_v12) {
       return function () {
          switch (_v12.ctor)
          {case "_Tuple2":
-            return _U.cmp(collageWidth + collageOffsetX,
-              _v12._0) > -1 && _U.cmp(collageHeight + collageOffsetY,
-              _v12._1) > -1;}
+            return function () {
+                 var value = A2(dataY,
+                 converterV,
+                 _v12._1);
+                 var $ = converterV.y,
+                 ymin = $._0,
+                 ymax = $._1;
+                 return $Basics.max(ymin)(A2($Basics.min,
+                 ymax,
+                 value));
+              }();}
          _U.badCase($moduleName,
-         "on line 47, column 21 to 96");
+         "between lines 91 and 93");
       }();
    };
+   var inRectangle = F2(function (_v16,
+   rec) {
+      return function () {
+         switch (_v16.ctor)
+         {case "_Tuple2":
+            return function () {
+                 var inY = _U.cmp(_v16._1,
+                 rec.y0 + rec.h) < 1 && _U.cmp(_v16._1,
+                 rec.y0) > -1;
+                 var inX = _U.cmp(_v16._0,
+                 rec.x0 + rec.w) < 1 && _U.cmp(_v16._0,
+                 rec.x0) > -1;
+                 return inX && inY;
+              }();}
+         _U.badCase($moduleName,
+         "between lines 18 and 20");
+      }();
+   });
+   var canvasMouseOnV = function (pos) {
+      return function () {
+         var _v20 = canvasMousePosition(pos);
+         switch (_v20.ctor)
+         {case "Just":
+            return A2(inRectangle,
+              _v20._0,
+              rectV);
+            case "Nothing": return false;}
+         _U.badCase($moduleName,
+         "between lines 157 and 159");
+      }();
+   };
+   var canvasMouseOnU = function (pos) {
+      return function () {
+         var _v22 = canvasMousePosition(pos);
+         switch (_v22.ctor)
+         {case "Just":
+            return A2(inRectangle,
+              _v22._0,
+              rectU);
+            case "Nothing": return false;}
+         _U.badCase($moduleName,
+         "between lines 163 and 165");
+      }();
+   };
+   var Rectangle = F4(function (a,
+   b,
+   c,
+   d) {
+      return {_: {}
+             ,h: d
+             ,w: c
+             ,x0: a
+             ,y0: b};
+   });
    _elm.Renderer.values = {_op: _op
-                          ,collageOffsetX: collageOffsetX
-                          ,collageOffsetY: collageOffsetY
-                          ,collageWidth: collageWidth
-                          ,collageHeight: collageHeight
-                          ,toCoordinate: toCoordinate
+                          ,Rectangle: Rectangle
+                          ,inRectangle: inRectangle
+                          ,intervalLen: intervalLen
+                          ,collageRec: collageRec
+                          ,Converter: Converter
+                          ,spaceX: spaceX
+                          ,spaceY: spaceY
+                          ,dataX: dataX
+                          ,dataY: dataY
+                          ,rectU: rectU
+                          ,converterU: converterU
+                          ,getX: getX
+                          ,rectV: rectV
+                          ,converterV: converterV
+                          ,rectR: rectR
+                          ,converterR: converterR
+                          ,getV: getV
+                          ,plot: plot
                           ,drawString1D: drawString1D
-                          ,drawString1DQ: drawString1DQ
+                          ,drawString1DV: drawString1DV
                           ,drawBorder: drawBorder
                           ,drawBorders: drawBorders
+                          ,drawReceiver: drawReceiver
+                          ,drawLog: drawLog
                           ,render: render
-                          ,inCollage: inCollage
-                          ,layerRelativeY: layerRelativeY
-                          ,asX: asX};
+                          ,canvasMousePosition: canvasMousePosition
+                          ,canvasMouseOnV: canvasMouseOnV
+                          ,canvasMouseOnU: canvasMouseOnU};
    return _elm.Renderer.values;
 };
 Elm.Result = Elm.Result || {};
