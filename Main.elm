@@ -44,9 +44,12 @@ stepSim : Event -> Simulation -> Simulation
 stepSim ev sim =
     let dt = 1/500
         safe_tail lst = if List.length lst > 1 then List.tail lst else lst
-        -- TODO: limit to size of model list
         -- TODO: do not store environment changes instead modify the last one
-        add_model model = model :: sim.models
+        modelSizeLimit = floor (1/dt*10)  -- store 10 sn of data
+        add_model model =
+            if List.length sim.models < modelSizeLimit
+            then model :: sim.models
+            else model :: (List.take (modelSizeLimit - 1) sim.models)
         cur_model = curModel sim
         whichLayer coord = Model.whichLayer cur_model <| Renderer.getX coord
         vToQ v = v^2
