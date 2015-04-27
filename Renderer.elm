@@ -25,9 +25,9 @@ drawString1D str =
     let pathify i x = toCoordinate (x, Model.getU str i)
     in path <| Array.toList <| Array.indexedMap pathify str.x
 
-drawString1DQ : Model.String1D -> Path
-drawString1DQ str =
-    let pathify i x = (x*400-200, (Model.getQ str i)*30)
+drawString1DV : Model.String1D -> Path
+drawString1DV str =
+    let pathify i x = (x*400-200, 100 + (sqrt (Model.getQ str i))*100)
     in path <| Array.toList <| Array.indexedMap pathify str.x
 
 
@@ -41,13 +41,13 @@ drawBorders str = List.map drawBorder str.borders
 render str =
     let borderlines = List.map (traced (dashed gray)) <| drawBorders str
     in collage collageWidth collageHeight <| List.append borderlines [ traced (solid lightBlue) (drawString1D str)
-                                                                     , traced (solid lightGreen) (drawString1DQ str)]
+                                                                     , traced (solid lightGreen) (drawString1DV str)]
 
 inCollage : (Int, Int) -> Bool
 inCollage (x, y) = (collageWidth + collageOffsetX >= x) && (collageHeight + collageOffsetY >= y)
 
 layerRelativeY : (Int, Int) -> Float
-layerRelativeY (x, y) = (200 - (toFloat y))/30
+layerRelativeY (x, y) = (100 - (toFloat y))/100
 
 asX : (Int, Int) -> Float
 asX (x, y) = 1/400 * (toFloat x)

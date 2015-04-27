@@ -20,8 +20,8 @@ f : Float -> Float-> Float
 f t x = (sin (pi*x + 10*t))*(exp -((x-0.5)^2/0.001))*(exp -(t^2/0.1))
 
 boundaries = [0.3, 0.7]
-qs = [1, 5, 3]
-defaultStr = Model.string1d (0, 1) 300 boundaries qs f
+qs = [0.5, 0.25, 0.15]
+defaultStr = Model.string1d (0, 1) 500 boundaries qs f
 
 -- Initiate Simulation
 
@@ -42,12 +42,17 @@ curModel sim = List.head sim.models
 
 stepSim : Event -> Simulation -> Simulation
 stepSim ev sim =
-    let dt = 1/100
+    let dt = 1/500
         safe_tail lst = if List.length lst > 1 then List.tail lst else lst
         add_model model = model :: sim.models
         cur_model = curModel sim
         whichLayer pos = Model.whichLayer cur_model <| Renderer.asX pos
-        updateLayer pos = Model.updateLayerAt cur_model (whichLayer pos) (Renderer.layerRelativeY pos)
+        minV = 0
+        maxV = 1
+        validV v = (minV <= v) && (maxV > v)
+        getVFromUI pos = Renderer.layerRelativeY pos
+        vToQ v = v^2
+        updateLayer pos = Model.updateLayerAt cur_model (whichLayer pos) (vToQ (getVFromUI pos))
     in case ev of
       Tick t -> case sim.state of
                   Playing -> { sim | models <- add_model <| Model.step cur_model dt}
@@ -61,8 +66,11 @@ stepSim ev sim =
       Button Default -> defaultSim
       MouseMove pos ->  if Renderer.inCollage pos then
                             case sim.editMode of
-                              MoveQ -> { sim | models <- add_model <|  updateLayer pos
-                                       , lastMousePos <- pos}
+                              MoveQ ->
+                                  if validV <| getVFromUI pos then
+                                      { sim | models <- add_model <|  updateLayer pos
+                                      , lastMousePos <- pos}
+                                  else { sim | lastMousePos <- pos}
                               otherwise -> { sim | lastMousePos <- pos}
                         else {sim | lastMousePos <- pos}
       MouseDown t -> if t && Renderer.inCollage sim.lastMousePos then
