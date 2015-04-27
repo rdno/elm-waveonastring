@@ -1,5 +1,5 @@
 {
-    "version": "0.2.0",
+    "version": "0.9.0",
     "summary": "Wave on a string simulation using finite difference",
     "repository": "https://github.com/rdno/elm-waveonastring.git",
     "license": "GPL3",
