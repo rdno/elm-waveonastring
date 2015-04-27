@@ -44,15 +44,13 @@ stepSim : Event -> Simulation -> Simulation
 stepSim ev sim =
     let dt = 1/500
         safe_tail lst = if List.length lst > 1 then List.tail lst else lst
+        -- TODO: limit to size of model list
+        -- TODO: do not store environment changes instead modify the last one
         add_model model = model :: sim.models
         cur_model = curModel sim
-        whichLayer pos = Model.whichLayer cur_model <| Renderer.asX pos
-        minV = 0
-        maxV = 1
-        validV v = (minV <= v) && (maxV > v)
-        getVFromUI pos = Renderer.layerRelativeY pos
+        whichLayer coord = Model.whichLayer cur_model <| Renderer.getX coord
         vToQ v = v^2
-        updateLayer pos = Model.updateLayerAt cur_model (whichLayer pos) (vToQ (getVFromUI pos))
+        updateLayer coord = Model.updateLayerAt cur_model (whichLayer coord) (vToQ (Renderer.getV coord))
     in case ev of
       Tick t -> case sim.state of
                   Playing -> { sim | models <- add_model <| Model.step cur_model dt}
@@ -64,30 +62,27 @@ stepSim ev sim =
       Button Forward -> { sim | state <- Paused
                         , models <- add_model <| Model.step cur_model dt}
       Button Default -> defaultSim
-      MouseMove pos ->  if Renderer.inCollage pos then
-                            case sim.editMode of
-                              MoveQ ->
-                                  if validV <| getVFromUI pos then
-                                      { sim | models <- add_model <|  updateLayer pos
-                                      , lastMousePos <- pos}
-                                  else { sim | lastMousePos <- pos}
-                              otherwise -> { sim | lastMousePos <- pos}
-                        else {sim | lastMousePos <- pos}
-      MouseDown t -> if t && Renderer.inCollage sim.lastMousePos then
-                         case sim.editMode of
-                           NoEdit -> { sim | models <- add_model <|  updateLayer sim.lastMousePos
-                                             , editMode <- MoveQ}
-                           AddBorder -> let newBorder = Renderer.asX sim.lastMousePos
-                                        in {sim | models <- add_model <|  Model.addBorderAt cur_model newBorder
-                                           , editMode <- NoEdit}
-                           RemoveBorder -> let px = Renderer.asX sim.lastMousePos
-                                               m = curModel sim
-                                               n = List.filter (\(i, x) -> x) <| List.indexedMap (\i x -> (i, Utils.near x px 0.01)) m.borders
-                                               layerID = if List.isEmpty n then List.length m.layers else fst <| List.head n
-                                           in {sim | models <- add_model <| Model.removeBorderAt m layerID
-                                                    , editMode <- NoEdit}
-                           otherwise -> sim
-                     else { sim | editMode <- NoEdit}
+      MouseMove pos ->  let updatedSim = {sim | lastMousePos <- pos}
+                        in case Renderer.canvasMousePosition pos of
+                             Just coord ->
+                              case sim.editMode of
+                                MoveQ ->  { updatedSim | models <- add_model <| updateLayer coord }
+                                otherwise -> updatedSim
+                             Nothing -> updatedSim
+      MouseDown False -> { sim | editMode <- NoEdit}
+      MouseDown True -> case Renderer.canvasMousePosition sim.lastMousePos of
+                          Just coord ->
+                              case sim.editMode of
+                                NoEdit -> { sim | models  <- add_model <| updateLayer coord
+                                          ,       editMode <- MoveQ}
+                                AddBorder -> { sim | models <- add_model <| Model.addBorderAt cur_model <| Renderer.getX coord
+                                             ,       editMode <- NoEdit}
+                                RemoveBorder -> let px = Renderer.getX coord
+                                                    n = List.filter (\(i, x) -> x) <| List.indexedMap (\i x -> (i, Utils.near x px 0.01)) cur_model.borders
+                                                    layerID = if List.isEmpty n then List.length cur_model.layers else fst <| List.head n
+                                                in { sim | models <- add_model <| Model.removeBorderAt cur_model layerID
+                                                   ,       editMode <- NoEdit}
+                          Nothing -> { sim | editMode <- NoEdit }
       Button AddBorderBtn -> { sim | editMode <- AddBorder }
       Button RemoveBorderBtn -> { sim | editMode <- RemoveBorder }
       BoundaryChanged (Just (b, Left)) -> { sim | models <- add_model <| {cur_model | left <- b}}
